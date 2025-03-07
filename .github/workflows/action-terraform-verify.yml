@@ -10,33 +10,66 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  format:
     runs-on: ubuntu-latest
     name: terraform fmt check
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: 2
-      - name: Fetch changed files
-        id: pr_files
-        uses: jitterbit/get-changed-files@v1
-        with:
-          format: "space-delimited"
+        
       - name: Configure terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.2.4
-      - name: Validate terraform fmt (added_modified)
+          
+      - name: Validate terraform fmt
         run: |
-          CHECK_STATUS=0
-          for changed_file in ${{ steps.pr_files.outputs.added_modified }}; do
-            echo "Checking terraform fmt on ${changed_file}..."
-            if [[ $changed_file == *.tf ]]; then
-              terraform fmt -check $changed_file
-              if [[ $? -ne 0 ]]; then
-                echo "❌ terraform fmt failed on ${changed_file}"
-                CHECK_STATUS=1
-              fi
+          EXIT_CODE=0
+          git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep '\.tf$' | while read file; do
+            echo "Checking terraform fmt on ${file}..."
+            if [ -f "$file" ] && ! terraform fmt -check "$file"; then
+              echo "::error::❌ Terraform formatting failed for ${file}"
+              EXIT_CODE=1
             fi
           done
-          exit $CHECK_STATUS
+          exit $EXIT_CODE
+
+  validate:
+    runs-on: ubuntu-latest
+    name: terraform validate
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Configure terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.2.4
+          
+      - name: Terraform Init
+        working-directory: ./infrastructure
+        run: terraform init -backend=false
+        
+      - name: Terraform Validate
+        working-directory: ./infrastructure
+        run: |
+          if ! terraform validate; then
+            echo "::error::❌ Terraform validation failed"
+            exit 1
+          fi
+          
+      - name: Run tflint
+        uses: terraform-linters/setup-tflint@v3
+        
+      - name: Show tflint version
+        run: tflint --version
+        
+      - name: Init tflint
+        working-directory: ./infrastructure
+        run: tflint --init
+        
+      - name: Run tflint
+        working-directory: ./infrastructure
+        run: |
+          if ! tflint -f compact; then
+            echo "::error::❌ TFLint found issues"
+            exit 1
+          fi
