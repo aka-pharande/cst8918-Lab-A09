@@ -1,8 +1,10 @@
-provider "azurerm" {features {}}
+provider "azurerm" {
+  features {}
+}
 
 resource "azurerm_resource_group" "rg" {
-name     = "myResourceGroup"
-location = "East US"
+  name     = "myResourceGroup"
+  location = "East US"
 }
 
 resource "azurerm_storage_account" "storage" {
