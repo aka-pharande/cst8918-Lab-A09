@@ -17,33 +17,26 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 2
-
       - name: Fetch changed files
         id: pr_files
         uses: jitterbit/get-changed-files@v1
         with:
           format: "space-delimited"
-
       - name: Configure terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.2.4
-
       - name: Validate terraform fmt (added_modified)
         run: |
-          set -e  # Stop script on first error
-          
           CHECK_STATUS=0
           for changed_file in ${{ steps.pr_files.outputs.added_modified }}; do
             echo "Checking terraform fmt on ${changed_file}..."
-            
             if [[ $changed_file == *.tf ]]; then
-              terraform fmt -check $changed_file || CHECK_STATUS=1
+              terraform fmt -check $changed_file
+              if [[ $? -ne 0 ]]; then
+                echo "❌ terraform fmt failed on ${changed_file}"
+                CHECK_STATUS=1
+              fi
             fi
           done
-          
-          echo "CHECK_STATUS=$CHECK_STATUS" >> $GITHUB_ENV
-          if [[ $CHECK_STATUS -ne 0 ]]; then
-            echo "❌ Terraform formatting issues found!"
-            exit 1  # Force the workflow to fail
-          fi
+          exit $CHECK_STATUS
