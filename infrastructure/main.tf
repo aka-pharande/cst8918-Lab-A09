@@ -1,10 +1,13 @@
 provider "azurerm" {
-  features
+  features {}
   subscription_id = "45877b2c-82aa-41e4-8da1-8a4ebb66eaad"
 
 }
 
-resource "azurerm_resource_group" "rg" {name="myResourceGroup"location = "East US"}
+resource "azurerm_resource_group" "rg" {
+  name     = "myResourceGroup"
+  location = "East US"
+}
 
 resource "azurerm_storage_account" "storage" {
   name                     = "aakankshasa"
