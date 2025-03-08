@@ -24,13 +24,21 @@ jobs:
       - name: Validate terraform fmt
         run: |
           EXIT_CODE=0
-          git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep '\.tf$' | while read file; do
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep '\.tf$' || true)
+
+          if [[ -z "$CHANGED_FILES" ]]; then
+            echo "No changed Terraform files detected. Checking all .tf files..."
+            CHANGED_FILES=$(find . -type f -name "*.tf")
+          fi
+
+          for file in $CHANGED_FILES; do
             echo "Checking terraform fmt on ${file}..."
             if [ -f "$file" ] && ! terraform fmt -check "$file"; then
               echo "::error::❌ Terraform formatting failed for ${file}"
               EXIT_CODE=1
             fi
           done
+
           exit $EXIT_CODE
 
   validate:
