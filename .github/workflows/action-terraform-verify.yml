@@ -15,28 +15,28 @@ jobs:
     name: terraform fmt check
     steps:
       - uses: actions/checkout@v3
-
-      - name: Fetch changed files
-        id: pr_files
-        uses: jitterbit/get-changed-files@v1
-        with:
-          format: "space-delimited"
-
+        
       - name: Configure terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.2.4
           
+      - name: Fetch changed Terraform files
+        id: changed_files
+        run: |
+          echo "Fetching changed .tf files..."
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep '\.tf$' || true)
+          echo "Changed files: $CHANGED_FILES"
+          if [[ -z "$CHANGED_FILES" ]]; then
+            echo "No Terraform files detected in changes. Checking all .tf files..."
+            CHANGED_FILES=$(find . -type f -name "*.tf")
+          fi
+          echo "::set-output name=files::${CHANGED_FILES}"
+          
       - name: Validate terraform fmt
         run: |
           EXIT_CODE=0
-          CHANGED_FILES="${{ steps.pr_files.outputs.added_modified }}"
-          
-          if [[ -z "$CHANGED_FILES" ]]; then
-            echo "No changed Terraform files detected. Checking all .tf files..."
-            CHANGED_FILES=$(find . -type f -name "*.tf")
-          fi
-
+          CHANGED_FILES="${{ steps.changed_files.outputs.files }}"
           for file in $CHANGED_FILES; do
             echo "Checking terraform fmt on ${file}..."
             if [ -f "$file" ] && ! terraform fmt -check "$file"; then
@@ -44,7 +44,6 @@ jobs:
               EXIT_CODE=1
             fi
           done
-
           exit $EXIT_CODE
 
   validate:
@@ -67,5 +66,23 @@ jobs:
         run: |
           if ! terraform validate; then
             echo "::error::❌ Terraform validation failed"
+            exit 1
+          fi
+          
+      - name: Run tflint
+        uses: terraform-linters/setup-tflint@v3
+        
+      - name: Show tflint version
+        run: tflint --version
+        
+      - name: Init tflint
+        working-directory: ./infrastructure
+        run: tflint --init
+        
+      - name: Run tflint
+        working-directory: ./infrastructure
+        run: |
+          if ! tflint -f compact; then
+            echo "::error::❌ TFLint found issues"
             exit 1
           fi
