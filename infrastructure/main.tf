@@ -1,10 +1,9 @@
 terraform {
-  required_version = ">= 1.0"  # You can set this to the version of Terraform you are using or the minimum version you want to support.
-  
+  required_version = ">= 1.0"  # Specify the required version
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 2.0"  # You can specify the version you want to use. "~> 2.0" ensures it uses any 2.x version.
+      version = "~> 2.0"  # Specify the version constraint
     }
   }
 }
